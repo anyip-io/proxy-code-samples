@@ -1,4 +1,4 @@
-01-rust-reqwest/.idea/
+.idea/
 examples/
 target/
 .DS_Store
