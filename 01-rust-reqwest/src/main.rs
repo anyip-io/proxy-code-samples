@@ -18,31 +18,60 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // should get the products links from the search result
-    let links = paginate(&client, &url).await?;
-    let mut products = vec![];
+    let mut links = paginate(&client, &url).await?;
 
-    for link in links {
-        if let Some(target_url) = link {
-            // extract products details concurrently by spawning 1 task per product
-            products.push(extract_product_detail(client.clone(), target_url));
-        }
-    }
-
-    let start = Instant::now();
-    let products: Vec<Result<Product, Box<dyn Error>>> = futures::future::join_all(products).await;
-    let entire_time_elapsed = Instant::now() - start;
     let mut duration_per_product = vec![];
+    let mut retries = 0;
+    let total_links = links.len();
+    let start = Instant::now();
 
-    for product in products {
-        match product {
-            Ok(res) => {
-                println!("Product name {}", res.name);
-                duration_per_product.push(res.elapsed);
-            }
-            Err(err) => eprintln!("Error: {}", err), // just print the error out
+    while retries < 3 {
+        println!("-- Attempt #{}\n", retries + 1);
+        let mut products = vec![];
+
+        for link in &links {
+            // extract products details concurrently by spawning 1 task per product
+            products.push(extract_product_detail(client.clone(), link.clone()));
         }
-        println!("----------------------");
+
+        // scrape all products concurrently
+        let results: Vec<Result<Product, Box<dyn Error>>> =
+            futures::future::join_all(products).await;
+
+        for product in results {
+            match product {
+                Ok(res) => {
+                    println!("Product name {}", &res.name);
+                    duration_per_product.push(res.elapsed);
+
+                    // that link has been successfully extracted, we can remove it form the list
+                    // remember it the Product::url contains the full amazon url, while the links list doesn't
+                    let index = links.iter().position(|item| res.url.contains(item));
+
+                    if let Some(idx) = index {
+                        // we remove it here
+                        links.remove(idx);
+                    }
+                }
+                Err(err) => eprintln!("Error: {}", err), // just print the error out
+            }
+            println!("----------------------");
+        }
+
+        println!(
+            "-- {}/{total_links} successfully scraped products\n",
+            total_links - links.len()
+        );
+
+        if links.len() == 0 {
+            // if there's no links left, we have scraped the entire list of products
+            break;
+        }
+
+        retries += 1;
     }
+
+    let entire_time_elapsed = Instant::now() - start;
     println!("Finished in {}s", entire_time_elapsed.as_secs());
     let average = duration_per_product.iter().sum::<f64>() / duration_per_product.len() as f64;
     println!("Average time / req: {:.2}s", average);
@@ -52,7 +81,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Go through the listing and get all the links
-async fn paginate(client: &Client, url: &str) -> Result<Vec<Option<String>>, Box<dyn Error>> {
+async fn paginate(client: &Client, url: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let mut links = vec![];
     println!("Paginating...");
 
@@ -76,7 +105,10 @@ async fn paginate(client: &Client, url: &str) -> Result<Vec<Option<String>>, Box
     for link in document.select(&selector) {
         // extract the product link from it
         let href = link.value().attr("href");
-        links.push(href.map(|m| m.to_owned()));
+
+        if let Some(content) = href {
+            links.push(content.to_owned());
+        }
     }
 
     println!("{} products found within' the listing", links.len());
