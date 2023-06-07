@@ -1,7 +1,10 @@
 use std::env;
 use std::error::Error;
+use std::time::Instant;
 use select::document::Document;
 use select::predicate::{Class, Name, Predicate};
+use rayon::prelude::*;
+use ureq::Agent;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let keyword = "boxing gloves";
@@ -12,6 +15,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let proxy = ureq::Proxy::new(proxy_endpoint)?;
     let agent = ureq::AgentBuilder::new()
         .proxy(proxy)
+        .max_idle_connections(0)
+        .max_idle_connections_per_host(0)
         .build();
 
     // This is call behind a proxy
@@ -22,6 +27,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let links = scrape_search_result(&resp);
     println!("List of links: {links:?}");
+
+    let start = Instant::now();
+    dbg!(scrape_products(agent.clone(),links.clone())?.len());
+    println!("Duration in sequential {:.3}ms", Instant::now().duration_since(start).as_secs_f64());
+
+    let start = Instant::now();
+    dbg!(scrape_products_par(agent.clone(),links.clone())?.len());
+    println!("Duration in parallel {:.3}ms", Instant::now().duration_since(start).as_secs_f64());
 
     Ok(())
 }
@@ -49,4 +62,30 @@ fn scrape_search_result(resp: &str) -> Vec<String> {
     }
 
     links
+}
+
+// sequential
+fn scrape_products(agent: Agent, list: Vec<String>) -> Result<Vec<String>, Box<dyn Error>> {
+    let responses = list.iter().map(|url| agent.get(url).call()).collect::<Vec<_>>();
+    let mut contents = vec![];
+
+    for response in responses {
+        let res = response?.into_string()?;
+        contents.push(res);
+    }
+
+    Ok(contents)
+}
+
+// parallel
+fn scrape_products_par(agent: Agent, list: Vec<String>) -> Result<Vec<String>, Box<dyn Error>> {
+    let responses = list.par_iter().map(|url| agent.get(url).call()).collect::<Vec<_>>();
+    let mut contents = vec![];
+
+    for response in responses {
+        let res = response?.into_string()?;
+        contents.push(res);
+    }
+
+    Ok(contents)
 }
