@@ -66,10 +66,26 @@ fn scrape_search_result(resp: &str) -> Vec<String> {
 
 // sequential
 fn scrape_products(agent: Agent, list: Vec<String>) -> Result<Vec<String>, Box<dyn Error>> {
-    Ok(list.iter().map(|url| agent.get(url).call().unwrap().into_string().unwrap()).collect::<Vec<_>>())
+    let responses = list.iter().map(|url| agent.get(url).call()).collect::<Vec<_>>();
+    let mut contents = vec![];
+
+    for response in responses {
+        let res = response?.into_string()?;
+        contents.push(res);
+    }
+
+    Ok(contents)
 }
 
 // parallel
 fn scrape_products_par(agent: Agent, list: Vec<String>) -> Result<Vec<String>, Box<dyn Error>> {
-    Ok(list.par_iter().map(|url| agent.get(url).call().unwrap().into_string().unwrap()).collect::<Vec<_>>())
+    let responses = list.par_iter().map(|url| agent.get(url).call()).collect::<Vec<_>>();
+    let mut contents = vec![];
+
+    for response in responses {
+        let res = response?.into_string()?;
+        contents.push(res);
+    }
+
+    Ok(contents)
 }
