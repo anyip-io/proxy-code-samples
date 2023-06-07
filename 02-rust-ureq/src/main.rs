@@ -29,6 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // println!("End of content\n");
 
     let mut links = scrape_search_result(&resp);
+    let links_len = links.len();
     println!("List of links: {links:?}");
     println!("----");
 
@@ -69,6 +70,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             attempt += 1;
         }
     }
+
+    println!("{links_len} links collected successfully");
 
     Ok(())
 }
