@@ -1,3 +1,4 @@
+use std::env;
 use std::error::Error;
 use select::document::Document;
 use select::predicate::{Class, Name, Predicate};
@@ -5,9 +6,10 @@ use select::predicate::{Class, Name, Predicate};
 fn main() -> Result<(), Box<dyn Error>> {
     let keyword = "boxing gloves";
     let url = format!("https://www.walmart.com/search?q={keyword}");
+    let proxy_endpoint = env::var("PROXY_ENDPOINT").expect("`PROXY_ENDPOINT` env var should be specified");
     println!("Target URL: {url}");
 
-    let proxy = ureq::Proxy::new("http://user-4fee53,type-mobile,country-us:password@portal.anyip.io:1080")?;
+    let proxy = ureq::Proxy::new(proxy_endpoint)?;
     let agent = ureq::AgentBuilder::new()
         .proxy(proxy)
         .build();
