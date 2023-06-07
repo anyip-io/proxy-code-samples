@@ -1,5 +1,6 @@
 use std::env;
 use std::error::Error;
+use std::io::ErrorKind;
 use std::time::Instant;
 use select::document::Document;
 use select::predicate::{Class, Name, Predicate};
@@ -22,19 +23,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     // This is call behind a proxy
     let resp = agent.get(&url).call()?.into_string()?;
 
-    println!("HTML of the page: {resp}");
-    println!("End of content\n");
+    // println!("HTML of the page: {resp}");
+    // println!("End of content\n");
 
     let links = scrape_search_result(&resp);
     println!("List of links: {links:?}");
 
     let start = Instant::now();
-    dbg!(scrape_products(agent.clone(),links.clone())?.len());
+    // dbg!(scrape_products(agent.clone(),links.clone())?.len());
     println!("Duration in sequential {:.3}s", Instant::now().duration_since(start).as_secs_f64());
 
     let start = Instant::now();
-    dbg!(scrape_products_par(agent.clone(),links.clone())?.len());
+    let res = scrape_products_par(agent.clone(),links.clone());
     println!("Duration in parallel {:.3}s", Instant::now().duration_since(start).as_secs_f64());
+    println!("success: {}/{}", res.iter().filter_map(|x| x.as_ref().ok()).count(), res.len());
+
+    println!("Error details:");
+    for i in res {
+        if let Err(e) = i{
+            dbg!(e);
+        }
+    }
 
     Ok(())
 }
@@ -78,14 +87,17 @@ fn scrape_products(agent: Agent, list: Vec<String>) -> Result<Vec<String>, Box<d
 }
 
 // parallel
-fn scrape_products_par(agent: Agent, list: Vec<String>) -> Result<Vec<String>, Box<dyn Error>> {
+fn scrape_products_par(agent: Agent, list: Vec<String>) -> Vec<Result<String, std::io::Error>> {
     let responses = list.par_iter().map(|url| agent.get(url).call()).collect::<Vec<_>>();
     let mut contents = vec![];
 
     for response in responses {
-        let res = response?.into_string()?;
+        let res = response
+            .map_err(|e| std::io::Error::new(ErrorKind::Other,e))
+            .and_then(|r|r.into_string());
+
         contents.push(res);
     }
 
-    Ok(contents)
+    contents
 }
