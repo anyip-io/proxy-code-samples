@@ -39,11 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("success: {}/{}", res.iter().filter_map(|x| x.as_ref().ok()).count(), res.len());
 
     println!("Error details:");
-    for i in res {
-        if let Err(e) = i{
-            dbg!(e);
-        }
-    }
+    res.iter().filter_map(|x| x.as_ref().err()).for_each(|e| println!("{}", e));
 
     Ok(())
 }
