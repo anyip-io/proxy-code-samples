@@ -30,11 +30,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     dbg!(scrape_products(agent.clone(),links.clone())?.len());
-    println!("Duration in sequential {:.3}ms", Instant::now().duration_since(start).as_secs_f64());
+    println!("Duration in sequential {:.3}s", Instant::now().duration_since(start).as_secs_f64());
 
     let start = Instant::now();
     dbg!(scrape_products_par(agent.clone(),links.clone())?.len());
-    println!("Duration in parallel {:.3}ms", Instant::now().duration_since(start).as_secs_f64());
+    println!("Duration in parallel {:.3}s", Instant::now().duration_since(start).as_secs_f64());
 
     Ok(())
 }
