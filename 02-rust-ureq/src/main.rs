@@ -1,7 +1,7 @@
 use std::env;
 use std::error::Error;
 use std::io::ErrorKind;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use select::document::Document;
 use select::predicate::{Class, Name, Predicate};
 use rayon::prelude::*;
@@ -18,6 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .proxy(proxy)
         .max_idle_connections(0)
         .max_idle_connections_per_host(0)
+        .timeout(Duration::from_secs(10))
         .build();
 
     // This is call behind a proxy
